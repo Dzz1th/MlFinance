@@ -13,16 +13,15 @@ import numpy
         #итерируемся по нашей бд по всем месяцам, когда доходим до июня - меняем год(в базе за месяц нужны данные
         # от июня до июня)
 
-# def BuildPortfolio(YearDataFrame  , MonthDataFrame ):
-#        YearDataFrame.sort_values(by = ['bookToMktcap'] , ascending = True)
-#        GrowthQuantile = YearDataFrame.quantile(q=0.3)['bookToMktcap']
-#        MidQuantile = YearDataFrame.quantile(q=0.7)['bookToMktcap']
+def BuildPortfolio(YearDataFrame  , MonthDataFrame ):
+        YearDataFrame.sort_values(by = ['bookToMktcap'] , ascending = True)
+        GrowthQuantile = YearDataFrame.quantile(q=0.3)
+        MidQuantile = YearDataFrame.quantile(q=0.7)
 
-#        GrowthDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < GrowthQuantile]
-#        MidDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < MidQuantile and YearDataFrame['bookToMktcap'] >= GrowthQuantile]
-#        ValueDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] >= MidQuantile]
-
-#        SmallValueDataFrame = ValueDataFrame[ValueDataFrame['Size']] # ????????
+        GrowthDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < GrowthQuantile['bookToMktcap']]
+        MidDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < MidQuantile['bookToMktcap'] and YearDataFrame['bookToMktcap'] >= GrowthQuantile['bookToMktcap']]
+        ValueDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] >= MidQuantile['bookToMktcap']]
+        SmallValueDataFrame = ValueDataFrame[ValueDataFrame['cap_size']] # ????????
 
 
 
@@ -45,16 +44,18 @@ del YearDataFrame['cap_size']
 
 
 CapitalMedian = YearDataFrame.quantile(0.5)
-print(CapitalMedian)
-#YearDataFrame.loc[: , 'cap_size'] = YearDataFrame.apply(lambda row : 'Small' if([row['mktcap_Dec'] <CapitalMedian]) else 'Large' , axis=1)
-        
+TestQuantile = YearDataFrame.quantile(0.3)
+print(CapitalMedian['mktcap_Dec'])
+print(TestQuantile)
+YearDataFrame.loc[: , 'cap_size'] = YearDataFrame.apply(lambda row : 'Small' if([row['mktcap_Dec'] <CapitalMedian['mktcap_Dec']]) else 'Large' , axis=1)
+YearDataFrame = YearDataFrame.sort_values(['bookToMktcap'])
 
 
 
 
 # print(YearDataFrame.shape)
 
-# print(YearDataFrame.head())
+print(YearDataFrame.head())
 
 # print(MonthDataFrame.shape)
 # print(MonthDataFrame.head())
