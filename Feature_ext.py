@@ -13,7 +13,7 @@ import numpy
         #итерируемся по нашей бд по всем месяцам, когда доходим до июня - меняем год(в базе за месяц нужны данные
         # от июня до июня)
 
-def BuildPortfolio(YearDataFrame  , MonthDataFrame ):
+def SliceDataFrame(YearDataFrame ):
         YearDataFrame.sort_values(by = ['bookToMktcap'] , ascending = True)
         GrowthQuantile = YearDataFrame.quantile(q=0.3)
         MidQuantile = YearDataFrame.quantile(q=0.7)
@@ -21,7 +21,47 @@ def BuildPortfolio(YearDataFrame  , MonthDataFrame ):
         GrowthDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < GrowthQuantile['bookToMktcap']]
         MidDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < MidQuantile['bookToMktcap'] and YearDataFrame['bookToMktcap'] >= GrowthQuantile['bookToMktcap']]
         ValueDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] >= MidQuantile['bookToMktcap']]
-        SmallValueDataFrame = ValueDataFrame[ValueDataFrame['cap_size']] # ????????
+        SmallValueDataFrame = ValueDataFrame[ValueDataFrame['cap_size']=="Small"]
+        return SmallValueDataFrame
+        
+def InitializeWeight(SlicedDataFrame):
+        mktcap_Dec_Summ = SlicedDataFrame['mktcap_Dec'].sum()
+        weight = {}
+
+        for index , row in SlicedDataFrame.iterrows():
+                weight[row['ws_id']] = row['mktcap_Dec'] / mktcap_Dec_Summ
+        
+        return weight
+
+def EvalMonthPortfolioProfit(weight , SlicedMonthDataFrame):
+        profit=0
+        for key , value in weight.items():
+                row = SlicedMonthDataFrame.loc[SlicedMonthDataFrame['ws_id']==key]
+                if(row):
+                        profit = profit + row['price']*value
+        
+        return profit
+
+def BalanceWeight(weight):
+        weight_value_sum = 0
+        new_weight = {}
+        for key , value in weight.items():
+                weight_value_sum += value
+        for key, value in weight.items():
+                new_weight[key] = weight[key] / weight_value_sum
+        
+        return new_weight
+
+def RebuildMonthPortfolio(weight , SlicedMonthDataFrame):
+        new_weight = {}
+        for key , value in weight.items():
+                row = SlicedMonthDataFrame.loc[SlicedMonthDataFrame['ws_id']==key]
+                if(row):
+                        new_weight[key] = weight[key] * (1 + row['price'])
+                else: new_weight[key] = 0
+        
+        new_weight = BalanceWeight(new_weight)
+        return new_weight
 
 
 
@@ -43,22 +83,23 @@ YearDataFrame = YearDataFrame.drop(YearDataFrame[YearDataFrame.year < 1986].inde
 del YearDataFrame['cap_size']
 
 
-CapitalMedian = YearDataFrame.quantile(0.5)
+CapitalMedian = YearDataFrame.quantile(0.3)
 TestQuantile = YearDataFrame.quantile(0.3)
 print(CapitalMedian['mktcap_Dec'])
 print(TestQuantile)
 YearDataFrame.loc[: , 'cap_size'] = YearDataFrame.apply(lambda row : 'Small' if([row['mktcap_Dec'] <CapitalMedian['mktcap_Dec']]) else 'Large' , axis=1)
 YearDataFrame = YearDataFrame.sort_values(['bookToMktcap'])
 
-
+print('lenght')
+print(len(YearDataFrame[YearDataFrame['bookToMktcap'] < 0].index) / len(YearDataFrame))
 
 
 # print(YearDataFrame.shape)
 
 print(YearDataFrame.head())
 
-# print(MonthDataFrame.shape)
-# print(MonthDataFrame.head())
+#print(MonthDataFrame.shape)
+print(MonthDataFrame.head())
 
 #book - ������������� �������� - ������� ������
 
