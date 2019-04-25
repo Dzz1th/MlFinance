@@ -13,7 +13,7 @@ import numpy
         #итерируемся по нашей бд по всем месяцам, когда доходим до июня - меняем год(в базе за месяц нужны данные
         # от июня до июня)
 
-def SliceDataFrame(YearDataFrame ):
+def SliceYearDataFrameToCategories(YearDataFrame):
         YearDataFrame.sort_values(by = ['bookToMktcap'] , ascending = True)
         GrowthQuantile = YearDataFrame.quantile(q=0.3)
         MidQuantile = YearDataFrame.quantile(q=0.7)
@@ -23,6 +23,16 @@ def SliceDataFrame(YearDataFrame ):
         ValueDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] >= MidQuantile['bookToMktcap']]
         SmallValueDataFrame = ValueDataFrame[ValueDataFrame['cap_size']=="Small"]
         return SmallValueDataFrame
+
+def SliceMonthDataFrame(MonthDataFrame , year):
+        DataFrame = MonthDataFrame[((MonthDataFrame['year'] == year) & (MonthDataFrame['month'] >= 6.0 )) | ((MonthDataFrame['year']==year+1) & (MonthDataFrame['month']<=6.0))]
+        return DataFrame
+
+def SliceYearDataFrame(YearDataFrame , year):
+        DataFrame = YearDataFrame[YearDataFrame['year'] == year]
+        return DataFrame
+
+
         
 def InitializeWeight(SlicedDataFrame):
         mktcap_Dec_Summ = SlicedDataFrame['mktcap_Dec'].sum()
@@ -63,43 +73,53 @@ def RebuildMonthPortfolio(weight , SlicedMonthDataFrame):
         new_weight = BalanceWeight(new_weight)
         return new_weight
 
+def BuildPortfolio(YearDataFrame , MonthDataFrame):
+        FirstIndex = 1986
+        LastIndex = 2017
+        ReturnableDataFrame = pd.DataFrame()
+        for year in range(FirstIndex , LastIndex):
+                SlicedMonthDataFrame = SliceMonthDataFrame(MonthDataFrame , year)
+                SlicedYearDataFrame = SliceYearDataFrame(YearDataFrame , year)
+                weight = InitializeWeight(SlicedYearDataFrame)
+                for i in range(1 , 12):
+                        if(i <= 6):
+                                month = i+6
+                                DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year) &(SlicedMonthDataFrame['month']==month)]
+                        else:
+                                month = i
+                                DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year+1) &(SlicedMonthDataFrame['month']==month)]
+                        profit = EvalMonthPortfolioProfit(weight , DataFrame)
+                        df = pd.DataFrame(columns=['year' , 'month' , 'weight' , 'profit'])
+                        series = pd.Series([year , month  , weight , profit] ,['year' , 'month' , 'weight' , 'profit'] )
+                        df.append(series , ignore_index=True )       
+                        ReturnableDataFrame.append(df)
+                        weight = RebuildMonthPortfolio(weight , DataFrame)
+        return ReturnableDataFrame
+
+def main():       
+        MonthDataFrame = pd.read_sas("c:\\Data\\allmonth.sas7bdat" , chunksize=None , iterator= False)
+        MonthDataFrame = MonthDataFrame.iloc[: , 0:6]
+
+        YearDataFrame = pd.read_sas('c:\\Data\\allyear.sas7bdat' , chunksize= None , iterator= False)
+
+        YearDataFrame = YearDataFrame[['year' ,'ws_id' , 'book' , 'mktcap_Dec' , 'cap_size']]
+
+        YearDataFrame.loc[: , 'bookToMktcap'] = YearDataFrame.apply(lambda row : row['book'] / row['mktcap_Dec'] , axis=1)
+        YearDataFrame = YearDataFrame.drop(YearDataFrame[YearDataFrame.year < 1986].index)
+
+        del YearDataFrame['cap_size']
+
+        CapitalMedian = YearDataFrame.quantile(0.5)
+        YearDataFrame.loc[: , 'cap_size'] = YearDataFrame.apply(lambda row : 'Small' if([row['mktcap_Dec'] <CapitalMedian['mktcap_Dec']]) else 'Large' , axis=1)
 
 
+        DataFrame = BuildPortfolio(YearDataFrame , MonthDataFrame)
+        print(DataFrame)
 
 
-
-MonthDataFrame = pd.read_sas("c:\\Data\\allmonth.sas7bdat" , chunksize=None , iterator= False)
-MonthDataFrame = MonthDataFrame.iloc[: , 0:6]
-
-YearDataFrame = pd.read_sas('c:\\Data\\allyear.sas7bdat' , chunksize= None , iterator= False)
-
-YearDataFrame = YearDataFrame[['year' ,'ws_id' , 'book' , 'mktcap_Dec' , 'cap_size']]
-
-YearDataFrame.loc[: , 'bookToMktcap'] = YearDataFrame.apply(lambda row : row['book'] / row['mktcap_Dec'] , axis=1)
-#YearDataFrame.loc[: , 'Value'] = YearDataFrame.apply(lambda row:  'Growth' if (row['bookToMktcap'] <1) else 'Value' , axis=1)
-YearDataFrame = YearDataFrame.drop(YearDataFrame[YearDataFrame.year < 1986].index)
+main()
 
 
-del YearDataFrame['cap_size']
-
-
-CapitalMedian = YearDataFrame.quantile(0.3)
-TestQuantile = YearDataFrame.quantile(0.3)
-print(CapitalMedian['mktcap_Dec'])
-print(TestQuantile)
-YearDataFrame.loc[: , 'cap_size'] = YearDataFrame.apply(lambda row : 'Small' if([row['mktcap_Dec'] <CapitalMedian['mktcap_Dec']]) else 'Large' , axis=1)
-YearDataFrame = YearDataFrame.sort_values(['bookToMktcap'])
-
-print('lenght')
-print(len(YearDataFrame[YearDataFrame['bookToMktcap'] < 0].index) / len(YearDataFrame))
-
-
-# print(YearDataFrame.shape)
-
-print(YearDataFrame.head())
-
-#print(MonthDataFrame.shape)
-print(MonthDataFrame.head())
 
 #book - ������������� �������� - ������� ������
 
