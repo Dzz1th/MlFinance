@@ -46,53 +46,66 @@ def InitializeWeight(SlicedDataFrame):
 def EvalMonthPortfolioProfit(weight , SlicedMonthDataFrame):
         profit=0
         for key , value in weight.items():
-                row = SlicedMonthDataFrame.loc[SlicedMonthDataFrame['ws_id']==key]
-                if(row):
-                        profit = profit + row['price']*value
-        
+                try:
+                        row = SlicedMonthDataFrame.loc[SlicedMonthDataFrame['ws_id']==key]
+                        row = row['price']
+                        price = row.tolist()
+                        #print('Price in eval month' , price)
+                        if(len(price) != 0):
+                                profit = profit + price[0]*value
+                except KeyError:
+                        profit += 0
         return profit
 
 def BalanceWeight(weight):
         weight_value_sum = 0
         new_weight = {}
         for key , value in weight.items():
+                #print(value)
                 weight_value_sum += value
         for key, value in weight.items():
-                new_weight[key] = weight[key] / weight_value_sum
+                if(weight_value_sum == 0):
+                        new_weight[key] = 0
+                else: new_weight[key] = weight[key] / weight_value_sum
         
         return new_weight
 
 def RebuildMonthPortfolio(weight , SlicedMonthDataFrame):
         new_weight = {}
         for key , value in weight.items():
-                row = SlicedMonthDataFrame.loc[SlicedMonthDataFrame['ws_id']==key]
-                if(row):
-                        new_weight[key] = weight[key] * (1 + row['price'])
-                else: new_weight[key] = 0
-        
+                try:
+                        row = SlicedMonthDataFrame.loc[SlicedMonthDataFrame['ws_id']==key]
+                        row = row['price']
+                        price = row.tolist()
+                        #print('price int rebuild' , price)
+                        if(len(price) == 0):
+                                new_weight[key] = 0
+                        else:
+                                new_weight[key] = weight[key] * (1 + price[0])
+                except KeyError:
+                        new_weight[key] = 0
         new_weight = BalanceWeight(new_weight)
         return new_weight
 
 def BuildPortfolio(YearDataFrame , MonthDataFrame):
         FirstIndex = 1986
         LastIndex = 2017
-        ReturnableDataFrame = pd.DataFrame()
+        ReturnableDataFrame = pd.DataFrame(data = [[0 ,0 , {} , 0]] , columns=['year' , 'month' , 'weight' , 'profit'])
         for year in range(FirstIndex , LastIndex):
                 SlicedMonthDataFrame = SliceMonthDataFrame(MonthDataFrame , year)
                 SlicedYearDataFrame = SliceYearDataFrame(YearDataFrame , year)
                 weight = InitializeWeight(SlicedYearDataFrame)
-                for i in range(1 , 12):
+                for i in range(0 , 13):
                         if(i <= 6):
                                 month = i+6
                                 DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year) &(SlicedMonthDataFrame['month']==month)]
                         else:
-                                month = i
+                                month = i-6
                                 DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year+1) &(SlicedMonthDataFrame['month']==month)]
                         profit = EvalMonthPortfolioProfit(weight , DataFrame)
-                        df = pd.DataFrame(columns=['year' , 'month' , 'weight' , 'profit'])
-                        series = pd.Series([year , month  , weight , profit] ,['year' , 'month' , 'weight' , 'profit'] )
-                        df.append(series , ignore_index=True )       
-                        ReturnableDataFrame.append(df)
+                        series = pd.Series(index=['year' , 'month' , 'weight' , 'profit'] , data = [year , month  , weight , profit] )
+                        df = pd.DataFrame([series])
+                        ReturnableDataFrame = ReturnableDataFrame.append(df)
                         weight = RebuildMonthPortfolio(weight , DataFrame)
         return ReturnableDataFrame
 
@@ -115,20 +128,6 @@ def main():
 
         DataFrame = BuildPortfolio(YearDataFrame , MonthDataFrame)
         print(DataFrame)
-
+        DataFrame.to_csv('data.csv')
 
 main()
-
-
-
-#book - ������������� �������� - ������� ������
-
-#��������� MKT , HML  , SMB  � ������� ������ 
-#������������� � ������ ����� �� mktcap(������������� ��������) � �� booktoMktcap
-#HML = 1/2(Small Value - Big Value) - 1/2(Small Growth - Big Growth)
-#��� �������� HML ���� �������� �� ������� � ������ �������� return �� �������� � 12 ������
-#��� �� � ���� ������������� � ������� ���� ������� �� Big-Small �� ������������� � �� Value-Neutral-Growth �� B/M)
-
-
-
-
