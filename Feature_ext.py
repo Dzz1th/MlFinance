@@ -87,7 +87,7 @@ def RebuildMonthPortfolio(weight , SlicedMonthDataFrame):
         new_weight = BalanceWeight(new_weight)
         return new_weight
 
-def BuildPortfolio(YearDataFrame , MonthDataFrame):
+def BuildPortfolio(YearDataFrame , MonthDataFrame , InitializeWeight , RebuildMonthPortfolio = None):
         FirstIndex = 1986
         LastIndex = 2017
         ReturnableDataFrame = pd.DataFrame(data = [[0 ,0 , {} , 0]] , columns=['year' , 'month' , 'weight' , 'profit'])
@@ -126,7 +126,7 @@ def main():
         YearDataFrame.loc[: , 'cap_size'] = YearDataFrame.apply(lambda row : 'Small' if([row['mktcap_Dec'] <CapitalMedian['mktcap_Dec']]) else 'Large' , axis=1)
 
 
-        DataFrame = BuildPortfolio(YearDataFrame , MonthDataFrame)
+        DataFrame = BuildPortfolio(YearDataFrame , MonthDataFrame , InitializeWeight , RebuildMonthPortfolio)
         print(DataFrame)
         DataFrame.to_csv('data.csv')
 
