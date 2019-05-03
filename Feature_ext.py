@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy 
+import time
 
 #Получаем Данные за прошлый год и за текущий(месячный датафрейм)
         #Сортируем компании в YearDataFrame по BE/MC
@@ -19,18 +20,20 @@ def SliceYearDataFrameToCategories(YearDataFrame):
         MidQuantile = YearDataFrame.quantile(q=0.7)
 
         GrowthDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < GrowthQuantile['bookToMktcap']]
-        MidDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] < MidQuantile['bookToMktcap'] and YearDataFrame['bookToMktcap'] >= GrowthQuantile['bookToMktcap']]
+        MidDataFrame = YearDataFrame[(YearDataFrame['bookToMktcap'] < MidQuantile['bookToMktcap']) & (YearDataFrame['bookToMktcap'] >= GrowthQuantile['bookToMktcap'])]
         ValueDataFrame = YearDataFrame[YearDataFrame['bookToMktcap'] >= MidQuantile['bookToMktcap']]
         SmallValueDataFrame = ValueDataFrame[ValueDataFrame['cap_size']=="Small"]
         return SmallValueDataFrame
 
 def SliceMonthDataFrame(MonthDataFrame , year):
         DataFrame = MonthDataFrame[((MonthDataFrame['year'] == year) & (MonthDataFrame['month'] >= 6.0 )) | ((MonthDataFrame['year']==year+1) & (MonthDataFrame['month']<=6.0))]
-        return DataFrame
+        MonthDataFrame = MonthDataFrame.drop(MonthDataFrame[((MonthDataFrame['year'] == year) & (MonthDataFrame['month'] >= 6.0 )) | ((MonthDataFrame['year']==year+1) & (MonthDataFrame['month']<=6.0))].index)
+        return [DataFrame , MonthDataFrame]
 
 def SliceYearDataFrame(YearDataFrame , year):
         DataFrame = YearDataFrame[YearDataFrame['year'] == year]
-        return DataFrame
+        YearDataFrame = YearDataFrame.drop(YearDataFrame[YearDataFrame['year'] < year].index)
+        return [DataFrame , YearDataFrame]
 
 
         
@@ -88,25 +91,34 @@ def RebuildMonthPortfolio(weight , SlicedMonthDataFrame):
         return new_weight
 
 def BuildPortfolio(YearDataFrame , MonthDataFrame , InitializeWeight , RebuildMonthPortfolio = None):
-        FirstIndex = 1986
-        LastIndex = 2017
-        ReturnableDataFrame = pd.DataFrame(data = [[0 ,0 , {} , 0]] , columns=['year' , 'month' , 'weight' , 'profit'])
+        FirstIndex = 1952
+        LastIndex = 1975
+        ReturnableDataFrame = pd.DataFrame(data = [[0 ,0 , 0 , 0]] , columns=['year' , 'month' , 'weight' ,'profit'])
         for year in range(FirstIndex , LastIndex):
-                SlicedMonthDataFrame = SliceMonthDataFrame(MonthDataFrame , year)
-                SlicedYearDataFrame = SliceYearDataFrame(YearDataFrame , year)
+                print(year)
+                start = time.time()
+                [SlicedMonthDataFrame , MonthDataFrame] = SliceMonthDataFrame(MonthDataFrame , year)
+                [SlicedYearDataFrame , YearDataFrame] = SliceYearDataFrame(YearDataFrame , year)
                 weight = InitializeWeight(SlicedYearDataFrame)
-                for i in range(0 , 13):
-                        if(i <= 6):
-                                month = i+6
-                                DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year) &(SlicedMonthDataFrame['month']==month)]
-                        else:
-                                month = i-6
-                                DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year+1) &(SlicedMonthDataFrame['month']==month)]
+                for i in range(0 , 7):
+                        month = i+6
+                        DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year) &(SlicedMonthDataFrame['month']==month)]
                         profit = EvalMonthPortfolioProfit(weight , DataFrame)
-                        series = pd.Series(index=['year' , 'month' , 'weight' , 'profit'] , data = [year , month  , weight , profit] )
+                        series = pd.Series(index=['year' , 'month' ,'weight' , 'profit'] , data = [year , month  ,weight ,  profit] )
                         df = pd.DataFrame([series])
                         ReturnableDataFrame = ReturnableDataFrame.append(df)
                         weight = RebuildMonthPortfolio(weight , DataFrame)
+                year += 1
+                for i in range(0 , 6):
+                        month = i+1
+                        DataFrame = SlicedMonthDataFrame[(SlicedMonthDataFrame['year']==year) &(SlicedMonthDataFrame['month']==month)]
+                        profit = EvalMonthPortfolioProfit(weight , DataFrame)
+                        series = pd.Series(index=['year' , 'month' ,'weight' , 'profit'] , data = [year , month  ,weight ,  profit] )
+                        df = pd.DataFrame([series])
+                        ReturnableDataFrame = ReturnableDataFrame.append(df)
+                        weight = RebuildMonthPortfolio(weight , DataFrame)
+                end = time.time() - start
+                print(end- start)
         return ReturnableDataFrame
 
 def main():       
@@ -118,13 +130,18 @@ def main():
         YearDataFrame = YearDataFrame[['year' ,'ws_id' , 'book' , 'mktcap_Dec' , 'cap_size']]
 
         YearDataFrame.loc[: , 'bookToMktcap'] = YearDataFrame.apply(lambda row : row['book'] / row['mktcap_Dec'] , axis=1)
-        YearDataFrame = YearDataFrame.drop(YearDataFrame[YearDataFrame.year < 1986].index)
+        YearDataFrame = YearDataFrame.drop(YearDataFrame[YearDataFrame.year < 1952].index)
 
         del YearDataFrame['cap_size']
 
+
+        MonthDataFrame = MonthDataFrame.sort_values(by=['year'])
+        MonthDataFrame = MonthDataFrame.drop(MonthDataFrame[MonthDataFrame.year < 1952].index)
+        YearDataFrame = YearDataFrame.sort_values(by=['year'])
+
         CapitalMedian = YearDataFrame.quantile(0.5)
         YearDataFrame.loc[: , 'cap_size'] = YearDataFrame.apply(lambda row : 'Small' if([row['mktcap_Dec'] <CapitalMedian['mktcap_Dec']]) else 'Large' , axis=1)
-
+        YearDataFrame = SliceYearDataFrameToCategories(YearDataFrame)
 
         DataFrame = BuildPortfolio(YearDataFrame , MonthDataFrame , InitializeWeight , RebuildMonthPortfolio)
         print(DataFrame)
